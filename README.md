@@ -59,24 +59,38 @@ kubectl -n cloud-mesh create secret generic google-api-key \
   --from-literal=GOOGLE_API_KEY='REPLACE_ME'
 ```
 
-### 6) Run the pipeline as a Job
+### 6) Create the persistent volume claim (PVC)
+By default, Pods and `emptyDir` volumes are ephemeral. A `PersistentVolumeClaim` gives you storage that survives across Jobs.
+
 ```bash
-kubectl apply -f k8s/job-procurement-pipeline.yaml
-kubectl -n cloud-mesh get jobs,pods -w
+kubectl apply -f k8s/pvc-chroma.yaml
+kubectl -n cloud-mesh get pvc
 ```
 
-### 7) Read logs (the “output” of the Job)
+### 7) Run the index Job (writes to the PVC)
 ```bash
-kubectl -n cloud-mesh logs job/procurement-pipeline
+kubectl apply -f k8s/job-procurement-index.yaml
+kubectl -n cloud-mesh wait --for=condition=complete job/procurement-index --timeout=300s
+kubectl -n cloud-mesh logs job/procurement-index
 ```
 
-### 8) Cleanup
+### 8) Run the query Job (reads from the same PVC)
 ```bash
-kubectl -n cloud-mesh delete job procurement-pipeline
+kubectl apply -f k8s/job-procurement-query.yaml
+kubectl -n cloud-mesh wait --for=condition=complete job/procurement-query --timeout=300s
+kubectl -n cloud-mesh logs job/procurement-query
+```
+
+### 9) Cleanup
+```bash
+kubectl -n cloud-mesh delete job procurement-index procurement-query
+kubectl -n cloud-mesh delete pvc procurement-chroma
 kind delete cluster --name cloud-mesh
 ```
 
 ## Files
 - `k8s/namespace.yaml`: namespace used for the demo.
 - `k8s/secret.example.yaml`: safe example secret manifest (placeholder value).
-- `k8s/job-procurement-pipeline.yaml`: runs Project 2 end-to-end in a Kubernetes Job.
+- `k8s/pvc-chroma.yaml`: persistent storage for the Chroma index.
+- `k8s/job-procurement-index.yaml`: generates data + indexes documents into Chroma (PVC-backed).
+- `k8s/job-procurement-query.yaml`: queries the existing Chroma index (PVC-backed).

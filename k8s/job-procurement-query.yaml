@@ -1,23 +1,25 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: procurement-pipeline
+  name: procurement-query
   namespace: cloud-mesh
 spec:
   backoffLimit: 0
   template:
     metadata:
       labels:
-        app: procurement-pipeline
+        app: procurement-query
     spec:
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: pipeline
+        - name: query
           image: ai-procurement-agent:local
           imagePullPolicy: IfNotPresent
           env:
@@ -34,14 +36,11 @@ spec:
           args:
             - |
               set -euo pipefail
-              mkdir -p /work/data /work/outputs /work/chroma
-              python data/generate_synthetic.py --out-dir /work/data
-              python main.py detect-tables --image /work/data/synthetic_table.png --out-dir /work/outputs
-              python main.py index-docs --data-dir /work/data --persist-dir /work/chroma --collection procurement_docs --reset
-              python main.py query --query "Which vendor appears most often in the sample data?" --persist-dir /work/chroma --collection procurement_docs --show-sources
+              python main.py query --query "Which vendor appears most often in the sample data?" --persist-dir /work/chroma --collection procurement_docs
           volumeMounts:
-            - name: workdir
-              mountPath: /work
+            - name: chroma
+              mountPath: /work/chroma
       volumes:
-        - name: workdir
-          emptyDir: {}
+        - name: chroma
+          persistentVolumeClaim:
+            claimName: procurement-chroma
