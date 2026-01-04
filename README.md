@@ -4,6 +4,7 @@ Containerize and run the AI Procurement RAG pipeline on Kubernetes using Jobs, a
 
 ## Contents
 - [What I Built & Why](#what-i-built--why)
+- [Decisions & Tradeoffs](#decisions--tradeoffs)
 - [Architecture & Flow](#architecture--flow)
 - [Components & Versions](#components--versions)
 - [Runbook (Build -> Deploy -> Run -> Schedule)](#runbook-build---deploy---run---schedule)
@@ -16,6 +17,11 @@ Containerize and run the AI Procurement RAG pipeline on Kubernetes using Jobs, a
 - **PVC-backed persistence**: Chroma index survives across Jobs to avoid re-indexing.
 - **CronJob scheduling**: automated re-indexing with concurrency control.
 - **Secret injection**: API keys stay out of git and are injected at runtime.
+
+## Decisions & Tradeoffs
+- **Jobs instead of Deployments** because the pipeline is batch; tradeoff is no always-on API.
+- **kind** for local Kubernetes; tradeoff is single-node, local-only testing.
+- **PVC for Chroma** to persist embeddings; tradeoff is extra storage management.
 
 ## Architecture & Flow
 ```mermaid
@@ -84,6 +90,7 @@ graph TD
 ## Results & Evidence
 - CronJob manual run completes end-to-end (generate -> detect -> index) and persists the Chroma index.
 - Query Job reads from the PVC without re-indexing.
+- The screenshot below shows both Jobs completing successfully in the `cloud-mesh` namespace.
 
 ![Kubernetes Jobs](docs/screenshots/k8s_jobs.svg)
 
