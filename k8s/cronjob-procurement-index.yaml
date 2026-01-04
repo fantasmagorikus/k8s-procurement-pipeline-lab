@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: procurement-index-cron
+  namespace: cloud-mesh
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: procurement-index
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: index
+              image: ai-procurement-agent:local
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: GOOGLE_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: google-api-key
+                      key: GOOGLE_API_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              command: ["sh", "-lc"]
+              args:
+                - |
+                  set -euo pipefail
+                  python data/generate_synthetic.py --out-dir /work/data
+                  python main.py detect-tables --image /work/data/synthetic_table.png --out-dir /work/outputs
+                  python main.py index-docs --data-dir /work/data --persist-dir /work/chroma --collection procurement_docs --reset
+              volumeMounts:
+                - name: data
+                  mountPath: /work/data
+                - name: outputs
+                  mountPath: /work/outputs
+                - name: chroma
+                  mountPath: /work/chroma
+          volumes:
+            - name: data
+              emptyDir: {}
+            - name: outputs
+              emptyDir: {}
+            - name: chroma
+              persistentVolumeClaim:
+                claimName: procurement-chroma

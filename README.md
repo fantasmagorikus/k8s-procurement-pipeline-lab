@@ -8,6 +8,7 @@ This project focuses on packaging a Python CLI into a container image and runnin
 - Docker image build and run.
 - Kubernetes manifests as code (YAML).
 - Secret injection for API keys (no secrets committed).
+- Scheduled re-indexing with a Kubernetes `CronJob`.
 - Running a run-to-completion pipeline as a Kubernetes `Job`.
 
 ## Quick glossary (minimal)
@@ -81,9 +82,18 @@ kubectl -n cloud-mesh wait --for=condition=complete job/procurement-query --time
 kubectl -n cloud-mesh logs job/procurement-query
 ```
 
-### 9) Cleanup
+### 9) Optional: schedule re-indexing with a CronJob
+```bash
+kubectl apply -f k8s/cronjob-procurement-index.yaml
+kubectl -n cloud-mesh create job --from=cronjob/procurement-index-cron procurement-index-manual-001
+kubectl -n cloud-mesh wait --for=condition=complete job/procurement-index-manual-001 --timeout=300s
+kubectl -n cloud-mesh logs job/procurement-index-manual-001
+```
+
+### 10) Cleanup
 ```bash
 kubectl -n cloud-mesh delete job procurement-index procurement-query
+kubectl -n cloud-mesh delete cronjob procurement-index-cron
 kubectl -n cloud-mesh delete pvc procurement-chroma
 kind delete cluster --name cloud-mesh
 ```
@@ -94,3 +104,4 @@ kind delete cluster --name cloud-mesh
 - `k8s/pvc-chroma.yaml`: persistent storage for the Chroma index.
 - `k8s/job-procurement-index.yaml`: generates data + indexes documents into Chroma (PVC-backed).
 - `k8s/job-procurement-query.yaml`: queries the existing Chroma index (PVC-backed).
+- `k8s/cronjob-procurement-index.yaml`: scheduled re-indexing Job (PVC-backed).
