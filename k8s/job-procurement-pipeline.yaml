@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: procurement-pipeline
+  namespace: cloud-mesh
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: procurement-pipeline
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pipeline
+          image: ai-procurement-agent:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: google-api-key
+                  key: GOOGLE_API_KEY
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              mkdir -p /work/data /work/outputs /work/chroma
+              python data/generate_synthetic.py --out-dir /work/data
+              python main.py detect-tables --image /work/data/synthetic_table.png --out-dir /work/outputs
+              python main.py index-docs --data-dir /work/data --persist-dir /work/chroma --collection procurement_docs --reset
+              python main.py query --query "Which vendor appears most often in the sample data?" --persist-dir /work/chroma --collection procurement_docs --show-sources
+          volumeMounts:
+            - name: workdir
+              mountPath: /work
+      volumes:
+        - name: workdir
+          emptyDir: {}
