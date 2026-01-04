@@ -85,6 +85,8 @@ graph TD
 - CronJob manual run completes end-to-end (generate -> detect -> index) and persists the Chroma index.
 - Query Job reads from the PVC without re-indexing.
 
+![Kubernetes Jobs](docs/screenshots/k8s_jobs.svg)
+
 ## Kubernetes Manifests
 - `k8s/namespace.yaml`: namespace for the demo.
 - `k8s/secret.example.yaml`: safe example secret manifest.
